@@ -1,174 +1,104 @@
-
-
-<!-- App.svelte -->
 <script>
-    import { writable } from 'svelte/store';
-    import axios from 'axios';
-    import Fabric from 'fabric';
-	import { onMount } from 'svelte';
-    const members = writable([]);
-    let searchText = '';
-    let canvas;
+  import { onMount, createEventDispatcher } from 'svelte';
+  import { fabric } from 'fabric';
 
-    onMount(async () => {
-        const response = await axios.get('https://api.github.com/orgs/mozilla/members?page=1');
-        members.set(response.data);
+  let canvas;
+  let members = []; // Store all members fetched from API
+  let filteredMembers = []; // Store filtered members based on search input
+  const dispatch = createEventDispatcher();
 
-        // Initialize Fabric.js canvas
-        const width = window.innerWidth * 0.8; // 80% of window width
-        const height = window.innerHeight * 0.8; // 80% of window height
-        canvas = new Fabric.Canvas('canvas', { width, height });
+  // Function to filter members based on search input
+  function filterMembers(query) {
+    filteredMembers = members.filter(member =>
+      member.login.toLowerCase().includes(query.toLowerCase())
+    );
+    renderMembers(filteredMembers);
+  }
 
-        // Render name cards for each member
-        updateCanvas();
+  // Function to render members on canvas
+  function renderMembers(membersToRender) {
+    canvas.clear(); // Clear canvas before rendering new members
+    let topPosition = 10; // Initial top position
+    membersToRender.forEach(member => {
+      createCard(member, topPosition);
+      topPosition += 120; // Adjust this value as needed for spacing between cards
+    });
+  }
+
+  onMount(() => {
+    const width = window.innerWidth * 0.8;
+    const height = window.innerHeight * 0.8;
+    canvas = new fabric.Canvas('canvas', { width, height });
+
+    fetch('https://api.github.com/orgs/mozilla/members?page=1')
+      .then(response => response.json())
+      .then(data => {
+        members = data; // Store fetched members
+        filteredMembers = data; // Initially, display all members
+        renderMembers(filteredMembers); // Render members on canvas
+      })
+      .catch(error => {
+        console.error('Error fetching members:', error);
+      });
+  });
+
+  function createCard(member, topPosition) {
+    // Create a group for the card
+    const cardGroup = new fabric.Group([], {
+      left: 10,
+      top: topPosition,
+	  margin:"10px",
     });
 
-    $: filteredMembers = $members.filter(member => member.login.toLowerCase().includes(searchText.toLowerCase()));
+    // Add avatar image
+    fabric.Image.fromURL(member.avatar_url, function(img) {
+      img.scaleToWidth(100);
+      img.scaleToHeight(100);
+      cardGroup.addWithUpdate(img);
 
-    let isDragging = false;
-    let offsetX = 0;
-    let offsetY = 0;
-    let originalPositions = {};
+      // Add name text
+      const text = new fabric.Text(member.login, {
+        left: 10,
+        top: 110,
+        fontSize: 16,
+        fill: '#333',
+      });
+      cardGroup.addWithUpdate(text);
+	   console.log("cardgrp",cardGroup)
 
-    const updateCanvas = () => {
-        canvas.clear();
-        originalPositions = {};
+      // Add click event to open profile in new tab
+      
 
-        filteredMembers.forEach((member, index) => {
-            const text = new Fabric.Text(member.login, { left: 50, top: 50 + index * 30 });
-            text.githubUrl = member.html_url;
-            canvas.add(text);
-            originalPositions[member.login] = { left: text.left, top: text.top };
-        });
-    };
-
-    canvas?.on('mouse:down', function(options) {
-        if (options.target) {
-            isDragging = true;
-            const { left, top } = options.target.getCenterPoint();
-            offsetX = options.e.clientX - left;
-            offsetY = options.e.clientY - top;
-        }
+      canvas.add(cardGroup);
     });
-
-    canvas?.on('mouse:move', function(options) {
-        if (isDragging && options.target) {
-            options.target.set({
-                left: options.e.clientX - offsetX,
-                top: options.e.clientY - offsetY
-            });
-            canvas.renderAll();
-        }
-    });
-
-    canvas?.on('mouse:up', function(options) {
-        if (isDragging) {
-            isDragging = false;
-            const { left, top } = options.target;
-            originalPositions[options.target.text] = { left, top };
-        }
-    });
-
-    // Reset card positions when search text changes
-    $: {
-        if (!searchText) {
-            Object.keys(originalPositions).forEach(text => {
-                const { left, top } = originalPositions[text];
-                const card = canvas.getObjects().find(obj => obj.text === text);
-                if (card) {
-                    card.set({ left, top });
-                    canvas.renderAll();
-                }
-            });
-        }
-    }
-
-    // Make the canvas responsive
-    window.addEventListener('resize', () => {
-        const width = window.innerWidth * 0.8; // 80% of window width
-        const height = window.innerHeight * 0.8; // 80% of window height
-        canvas.setDimensions({ width, height });
-        canvas.renderAll();
-    });
+  }
 </script>
 
 <style>
-    /* Global styles */
-    body {
-        font-family: 'Arial', sans-serif;
-        margin: 0;
-        padding: 0;
-        background-color: #f8f9fa;
-    }
+  .container {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    margin-top: 20px;
+  }
 
-    /* Header styles */
-    h1 {
-        text-align: center;
-        padding: 20px 0;
-        background-color: #0366d6;
-        color: white;
-        margin: 0;
-    }
+  input[type="text"] {
+    padding: 10px;
+    font-size: 16px;
+    border-radius: 5px;
+    border: 1px solid #ccc;
+    margin-bottom: 20px;
+    width: 300px;
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+  }
 
-    /* Search input styles */
-    input[type="text"] {
-        padding: 10px;
-        font-size: 16px;
-        border: 1px solid #ccc;
-        border-radius: 5px;
-        width: 80%;
-        max-width: 400px;
-        margin: 20px auto;
-        display: block;
-    }
-
-    /* Member card styles */
-    .member-card {
-        display: flex;
-        align-items: center;
-        margin: 10px auto;
-        padding: 10px;
-        background-color: #fff;
-        border-radius: 5px;
-        box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
-        max-width: 400px;
-    }
-
-    .member-card img {
-        border-radius: 50%;
-        margin-right: 10px;
-    }
-
-    .member-card a {
-        text-decoration: none;
-        color: #0366d6;
-        font-weight: bold;
-    }
-
-    /* Canvas styles */
-    canvas {
-        display: block;
-        margin: 20px auto;
-        border: 1px solid #ccc;
-        border-radius: 5px;
-        box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
-        max-width: 80%;
-        max-height: 400px;
-    }
+  canvas {
+    border-radius: 10px;
+    box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+  }
 </style>
 
-
-<h1>Svelte GitHub Canvas</h1>
-
-<input type="text" bind:value={searchText} placeholder="Search members..." />
-
-{#each filteredMembers as member}
-    <div class="member-card">
-        <img src={member.avatar_url} alt={member.login} width="50" height="50" />
-        <a href={member.html_url} target="_blank">{member.login}</a>
-    </div>
-{/each}
-
-<canvas id="canvas"></canvas>
-
-
+<div class="container">
+  <input type="text" placeholder="Search members..." on:input={e => filterMembers(e.target.value)} />
+  <canvas id="canvas"></canvas>
+</div>
