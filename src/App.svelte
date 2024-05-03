@@ -139,6 +139,7 @@
         const nameText = new fabric.Text(member.login, {
           left: img.getScaledWidth() + 10, // Position text next to the image
           top: 0,
+		  left: -10,
           fontSize: 20,
           fill: "black",
           originX: "left",
