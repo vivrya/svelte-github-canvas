@@ -8,6 +8,7 @@
   let filteredMembers = [];
   let isDraggingCanvas = false;
   let lastMousePosition;
+  let copiedMembers = [];
 
   // Set card dimensions
   const cardWidth = 500; // Width of each list item
@@ -16,11 +17,64 @@
 
   // Function to filter members based on search input
   function filterMembers(query) {
+    if (query.trim() === "") {
+      // If the query is empty, render both filtered and copied members
+      renderCopiedMembers();
+      return;
+    }
+
+    // Filter the members based on the query
     filteredMembers = members.filter((member) =>
       member.login.toLowerCase().includes(query.toLowerCase())
     );
 
     renderMembers(filteredMembers);
+  }
+
+ function renderCopiedMembers() {
+    const sidebar = document.querySelector(".sidebar");
+
+    // Clear the sidebar
+    sidebar.innerHTML = "";
+
+    // Render each copied member as a card in the sidebar
+    copiedMembers.forEach((member) => {
+        const card = document.createElement("div");
+        card.style.display = "flex";
+        card.style.alignItems = "center";
+        card.style.padding = "5px";
+        card.style.margin = "5px";
+        card.style.border = "1px solid #ccc";
+        card.style.borderRadius = "5px";
+        card.style.cursor = "pointer";
+
+        // Create an image element for the member's avatar
+        const img = document.createElement("img");
+        img.src = member.avatar_url;
+        img.alt = member.login;
+        img.style.width = "50px";
+        img.style.height = "50px";
+        img.style.borderRadius = "50%";
+        img.style.marginRight = "10px";
+
+        // Create a span element for the member's login name
+        const nameSpan = document.createElement("span");
+        nameSpan.textContent = member.login;
+        nameSpan.style.fontWeight = "bold";
+
+        // Append the image and name to the card
+        card.appendChild(img);
+        card.appendChild(nameSpan);
+
+        // Append the card to the sidebar
+        sidebar.appendChild(card);
+    });
+
+
+
+
+
+
   }
 
   // Function to render members on the canvas
@@ -38,8 +92,9 @@
 
   onMount(() => {
     // Set up canvas dimensions
-    const width = window.innerWidth * 0.8;
+    const width = window.innerWidth *0.70;
     const height = window.innerHeight * 0.8;
+    const sidebarWidth = width * 0.27; // 30% of canvas width
 
     canvas = new fabric.Canvas("canvas", {
       width,
@@ -49,10 +104,17 @@
       preserveObjectStacking: true,
     });
 
-    // Event listener for mouse down
-    canvas.on("mouse:down", function (opt) {
-      const evt = opt.e;
-      const target = opt.target;
+    // Event listener for keydown to detect Ctrl+S (or Cmd+S) key press
+    window.addEventListener("keydown", (e) => {
+		
+      if ((e.ctrlKey || e.metaKey) && e.key === "s") {
+		e.preventDefault()
+        // Append filteredMembers array to copiedMembers array
+        copiedMembers.push(...filteredMembers);
+        console.log("Filtered members appended to copiedMembers array:", copiedMembers);
+        renderCopiedMembers();
+		}
+		
 
       if (!target) {
         // If no target object (clicking on canvas background), start panning
@@ -139,7 +201,7 @@
         const nameText = new fabric.Text(member.login, {
           left: img.getScaledWidth() + 10, // Position text next to the image
           top: 0,
-		  left: -10,
+          left: -10,
           fontSize: 20,
           fill: "black",
           originX: "left",
@@ -282,35 +344,84 @@
   }
 </script>
 
-<div class="container">
-  <input
-    type="text"
-    placeholder="Search members..."
-    on:input={(e) => filterMembers(e.target.value)}
-  />
-  <canvas id="canvas"></canvas>
-</div>
+
 
 <style>
   .container {
     display: flex;
-    flex-direction: column;
+    flex-direction: row;
     align-items: center;
+    justify-content: center;
     margin-top: 20px;
-  }
+    padding: 20px;
+}
+
 
   input[type="text"] {
     padding: 10px;
     font-size: 16px;
     border-radius: 5px;
     border: 1px solid #ccc;
-    margin-bottom: 20px;
+    margin-right: 10px;
     width: 300px;
     box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
   }
 
   canvas {
+    width: 70vw; /* Set canvas width to 70% of viewport width */
+    height: 80vh; /* Set canvas height to 80% of viewport height */
     border-radius: 10px;
     box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+    margin-right: 10px; /* Add margin to separate canvas and sidebar */
   }
+
+  .sidebar {
+    width: 27vw; /* Set sidebar width to 30% of viewport width */
+    height: 78vh; /* Set sidebar height to 80% of viewport height */
+    padding: 10px;
+    background-color: #f9f9f9;
+    border-radius: 5px;
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+    overflow-y: auto; /* Enable vertical scrolling if content overflows */
+	margin-left:5px;
+  }
+
+
+
+
+
+
+
+
+
+
+
+
+
+/* Styles for the member details container */
+.member-details {
+  display: flex;
+  align-items: center;
+}
+
+/* Styles for the member name */
+.member-name {
+  font-weight: bold;
+}
 </style>
+
+<div class="container">
+  <input
+    type="text"
+    placeholder="Search members..."
+    on:input={(e) => filterMembers(e.target.value)}
+  />
+  </div>
+  <div style="display:flex;flex-direction:row">
+    <canvas id="canvas"></canvas>
+
+  <div class="sidebar">
+    <!-- Sidebar content goes here -->
+  </div>
+</div>
+
